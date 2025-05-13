@@ -1,39 +1,47 @@
-const express = require('express');
-const mongoose = require('mongoose');
-const cors = require('cors');
-require('dotenv').config();
-import path from "path";  // To load environment variables from .env file
+// server.js (ES module-compatible with deployment fixes)
+
+import express from 'express';
+import mongoose from 'mongoose';
+import cors from 'cors';
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+// Setup __dirname in ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Load environment variables
+dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-const _dirname = path.resolve();
 
 // Middleware
 app.use(cors());
-app.use(express.json());  // Parse JSON bodies
+app.use(express.json());
 
-
-mongoose.connect('mongodb://localhost:27017/mer-app')
-.then(()=>{
-    console.log('DB CONNECTTED!')
+// MongoDB connection
+mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/mer-app', {
+  useNewUrlParser: true,
+  useUnifiedTopology: true
 })
-.catch((err)=>{
-    console.log(error)
-})
+  .then(() => console.log('✅ DB CONNECTED'))
+  .catch((err) => console.error('❌ DB connection error:', err));
 
-// Stock Schema (Define the stock structure)
+// Mongoose Schema and Model
 const StockSchema = new mongoose.Schema({
   symbol: { type: String, required: true },
   quantity: { type: Number, required: true },
   price: { type: Number, required: true },
 });
+
 const Stock = mongoose.model('Stock', StockSchema);
 
-// POST: Add a new stock to the portfolio
+// Routes
 app.post('/api/stocks', async (req, res) => {
-  const { symbol, quantity, price } = req.body;
   try {
-    const newStock = new Stock({ symbol, quantity, price });
+    const newStock = new Stock(req.body);
     await newStock.save();
     res.status(201).json(newStock);
   } catch (err) {
@@ -41,30 +49,29 @@ app.post('/api/stocks', async (req, res) => {
   }
 });
 
-
-// GET: Fetch all stocks in the portfolio
 app.get('/api/stocks', async (req, res) => {
   try {
-    const stocks = await Stock.find();  // Get all stocks from MongoDB
-    res.json(stocks);  // Return the stocks as a response
+    const stocks = await Stock.find();
+    res.json(stocks);
   } catch (err) {
     res.status(500).json({ message: 'Error fetching stocks', error: err });
   }
 });
 
-// Test route to check if the server is running
 app.get('/', (req, res) => {
-  res.send('✅ Stock Portfolio Tracker API is running by the author of this application DEEPIKA.');
+  res.send('✅ Stock Portfolio Tracker API is running - by Deepika.');
 });
-if(process.env.NODE_ENV == "production"){
-  app.use(express.static(path.join(_dirname,"/todofrontend/src")));
 
-  app.get("*",(req,res)=>{
-    res.sendFile(path.resolve(_dirname,"todofrontend","src","index.js"))
-  })
+// Static assets handling for production
+if (process.env.NODE_ENV === 'production') {
+  app.use(express.static(path.join(__dirname, 'todofrontend', 'build')));
+
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, 'todofrontend', 'build', 'index.html'));
+  });
 }
 
 // Start the server
 app.listen(PORT, () => {
-  console.log(`🚀 Server running at http://localhost:${PORT}`);
+  console.log(`🚀 Server running on http://localhost:${PORT}`);
 });
