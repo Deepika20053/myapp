@@ -1,4 +1,4 @@
-// server.js (ES module-compatible with deployment fixes)
+// server.js (ES module-compatible and Render deployment-ready)
 
 import express from 'express';
 import mongoose from 'mongoose';
@@ -22,14 +22,14 @@ app.use(cors());
 app.use(express.json());
 
 // MongoDB connection
-mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/mer-app', {
+mongoose.connect(process.env.MONGO_URI, {
   useNewUrlParser: true,
-  useUnifiedTopology: true
+  useUnifiedTopology: true,
 })
-  .then(() => console.log('✅ DB CONNECTED'))
-  .catch((err) => console.error('❌ DB connection error:', err));
+.then(() => console.log('✅ MongoDB connected'))
+.catch((err) => console.error('❌ MongoDB connection error:', err));
 
-// Mongoose Schema and Model
+// Schema & Model
 const StockSchema = new mongoose.Schema({
   symbol: { type: String, required: true },
   quantity: { type: Number, required: true },
@@ -38,14 +38,14 @@ const StockSchema = new mongoose.Schema({
 
 const Stock = mongoose.model('Stock', StockSchema);
 
-// Routes
+// API Routes
 app.post('/api/stocks', async (req, res) => {
   try {
     const newStock = new Stock(req.body);
     await newStock.save();
     res.status(201).json(newStock);
   } catch (err) {
-    res.status(400).json({ message: 'Error saving stock', error: err });
+    res.status(400).json({ message: 'Error saving stock', error: err.message });
   }
 });
 
@@ -54,24 +54,26 @@ app.get('/api/stocks', async (req, res) => {
     const stocks = await Stock.find();
     res.json(stocks);
   } catch (err) {
-    res.status(500).json({ message: 'Error fetching stocks', error: err });
+    res.status(500).json({ message: 'Error fetching stocks', error: err.message });
   }
 });
 
+// Root route
 app.get('/', (req, res) => {
   res.send('✅ Stock Portfolio Tracker API is running - by Deepika.');
 });
 
-// Static assets handling for production
+// Serve static frontend (ONLY IF frontend is built inside this project)
 if (process.env.NODE_ENV === 'production') {
-  app.use(express.static(path.join(__dirname, 'todofrontend', 'build')));
+  const frontendPath = path.join(__dirname, 'todofrontend', 'build');
+  app.use(express.static(frontendPath));
 
   app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'todofrontend', 'build', 'index.html'));
+    res.sendFile(path.join(frontendPath, 'index.html'));
   });
 }
 
-// Start the server
+// Start server
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
+  console.log(`🚀 Server running on port ${PORT}`);
 });
