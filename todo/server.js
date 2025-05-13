@@ -1,4 +1,4 @@
-// server.js (ES module-compatible and Render deployment-ready)
+// server.js (ESM-compatible and Render deployment-ready)
 
 import express from 'express';
 import mongoose from 'mongoose';
@@ -7,7 +7,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-// Setup __dirname in ES modules
+// Setup __dirname for ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -16,18 +16,22 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+const MONGO_URI = process.env.MONGO_URI;
 
 // Middleware
 app.use(cors());
 app.use(express.json());
 
 // MongoDB connection
-mongoose.connect(process.env.MONGO_URI, {
+mongoose.connect(MONGO_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 })
-.then(() => console.log('✅ MongoDB connected'))
-.catch((err) => console.error('❌ MongoDB connection error:', err));
+  .then(() => console.log('✅ MongoDB connected'))
+  .catch((err) => {
+    console.error('❌ MongoDB connection error:', err);
+    process.exit(1); // stop the server if DB fails
+  });
 
 // Schema & Model
 const StockSchema = new mongoose.Schema({
@@ -63,7 +67,7 @@ app.get('/', (req, res) => {
   res.send('✅ Stock Portfolio Tracker API is running - by Deepika.');
 });
 
-// Serve static frontend (ONLY IF frontend is built inside this project)
+// Serve static files (React frontend) in production
 if (process.env.NODE_ENV === 'production') {
   const frontendPath = path.join(__dirname, 'todofrontend', 'build');
   app.use(express.static(frontendPath));
@@ -75,5 +79,5 @@ if (process.env.NODE_ENV === 'production') {
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`🚀 Server running on http://localhost:${PORT}`);
 });
