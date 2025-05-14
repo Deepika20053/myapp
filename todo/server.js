@@ -1,70 +1,183 @@
-const express = require('express');
-const mongoose = require('mongoose');
-const cors = require('cors');
-require('dotenv').config();
-import path from "path";  // To load environment variables from .env file
+import express from 'express';
+import mongoose from 'mongoose';
+import cors from 'cors';
+import dotenv from 'dotenv';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+import path from 'path';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
+import morgan from 'morgan';
 
+// Load environment variables
+dotenv.config();
+
+// Initialize express
 const app = express();
 const PORT = process.env.PORT || 5000;
-const _dirname = path.resolve();
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/mer-app';
+const NODE_ENV = process.env.NODE_ENV || 'development';
 
-// Middleware
-app.use(cors());
-app.use(express.json());  // Parse JSON bodies
+// ES Module __dirname equivalent
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
+// Security Middleware
+app.use(helmet()); // Adds various HTTP headers for security
+app.use(morgan('combined')); // Request logging
 
-mongoose.connect('mongodb://localhost:27017/mer-app')
-.then(()=>{
-    console.log('DB CONNECTTED!')
-})
-.catch((err)=>{
-    console.log(error)
-})
-
-// Stock Schema (Define the stock structure)
-const StockSchema = new mongoose.Schema({
-  symbol: { type: String, required: true },
-  quantity: { type: Number, required: true },
-  price: { type: Number, required: true },
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100 // limit each IP to 100 requests per windowMs
 });
+app.use('/api/', limiter);
+
+// CORS configuration
+const corsOptions = {
+  origin: process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : '*',
+  methods: ['GET', 'POST'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  exposedHeaders: ['Content-Range', 'X-Content-Range'],
+  credentials: true,
+  maxAge: 86400
+};
+app.use(cors(corsOptions));
+app.use(express.json({ limit: '10kb' })); // Body size limiting
+
+// MongoDB Connection with proper options
+mongoose.connect(MONGODB_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+  serverSelectionTimeoutMS: 5000,
+  socketTimeoutMS: 45000,
+  family: 4
+})
+.then(() => {
+  console.log('✅ MongoDB connected successfully');
+})
+.catch((err) => {
+  console.error('❌ MongoDB connection error:', err);
+  process.exit(1); // Exit if database connection fails
+});
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({
+    status: 'error',
+    message: NODE_ENV === 'production' ? 'Internal server error' : err.message
+  });
+});
+
+// Mongoose Schema with validation
+const StockSchema = new mongoose.Schema({
+  symbol: { 
+    type: String, 
+    required: true,
+    trim: true,
+    uppercase: true,
+    minLength: 1,
+    maxLength: 10
+  },
+  quantity: { 
+    type: Number, 
+    required: true,
+    min: 0
+  },
+  price: { 
+    type: Number, 
+    required: true,
+    min: 0
+  },
+}, {
+  timestamps: true
+});
+
 const Stock = mongoose.model('Stock', StockSchema);
 
-// POST: Add a new stock to the portfolio
-app.post('/api/stocks', async (req, res) => {
+// Input validation middleware
+const validateStockInput = (req, res, next) => {
   const { symbol, quantity, price } = req.body;
+  
+  if (!symbol || typeof symbol !== 'string' || symbol.length > 10) {
+    return res.status(400).json({ message: 'Invalid symbol' });
+  }
+  
+  if (!quantity || typeof quantity !== 'number' || quantity < 0) {
+    return res.status(400).json({ message: 'Invalid quantity' });
+  }
+  
+  if (!price || typeof price !== 'number' || price < 0) {
+    return res.status(400).json({ message: 'Invalid price' });
+  }
+  
+  next();
+};
+
+// Routes with proper error handling
+app.post('/api/stocks', validateStockInput, async (req, res) => {
   try {
+    const { symbol, quantity, price } = req.body;
     const newStock = new Stock({ symbol, quantity, price });
     await newStock.save();
-    res.status(201).json(newStock);
+    res.status(201).json({
+      status: 'success',
+      data: newStock
+    });
   } catch (err) {
-    res.status(400).json({ message: 'Error saving stock', error: err });
+    res.status(400).json({
+      status: 'error',
+      message: NODE_ENV === 'production' ? 'Error saving stock' : err.message
+    });
   }
 });
 
-
-// GET: Fetch all stocks in the portfolio
 app.get('/api/stocks', async (req, res) => {
   try {
-    const stocks = await Stock.find();  // Get all stocks from MongoDB
-    res.json(stocks);  // Return the stocks as a response
+    const stocks = await Stock.find().sort({ createdAt: -1 });
+    res.json({
+      status: 'success',
+      data: stocks
+    });
   } catch (err) {
-    res.status(500).json({ message: 'Error fetching stocks', error: err });
+    res.status(500).json({
+      status: 'error',
+      message: NODE_ENV === 'production' ? 'Error fetching stocks' : err.message
+    });
   }
 });
 
-// Test route to check if the server is running
-app.get('/', (req, res) => {
-  res.send('✅ Stock Portfolio Tracker API is running by the author of this application DEEPIKA.');
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'healthy' });
 });
-if(process.env.NODE_ENV == "production"){
-  app.use(express.static(path.join(_dirname,"/todofrontend/src")));
 
-  app.get("*",(req,res)=>{
-    res.sendFile(path.resolve(_dirname,"todofrontend","src","index.js"))
-  })
+app.get('/', (req, res) => {
+  res.send('✅ Stock Portfolio Tracker API is running - by Deepika.');
+});
+
+// Serve frontend in production
+if (NODE_ENV === 'production') {
+  app.use(express.static(path.join(__dirname, '/todofrontend/build')));
+  
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, 'todofrontend', 'build', 'index.html'));
+  });
 }
 
-// Start the server
-app.listen(PORT, () => {
-  console.log(`🚀 Server running at http://localhost:${PORT}`);
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('Received SIGTERM. Performing graceful shutdown...');
+  server.close(() => {
+    mongoose.connection.close(false, () => {
+      console.log('MongoDB connection closed.');
+      process.exit(0);
+    });
+  });
+});
+
+// Start server
+const server = app.listen(PORT, () => {
+  console.log(`🚀 Server running in ${NODE_ENV} mode on port ${PORT}`);
 });
