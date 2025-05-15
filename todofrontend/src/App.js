@@ -10,6 +10,7 @@ function App() {
   const [companyName, setCompanyName] = useState('');
   const [quantity, setQuantity] = useState('');
   const [price, setPrice] = useState('');
+  const [message, setMessage] = useState('');
 
   const handleLogin = () => {
     setIsAuthenticated(true);
@@ -18,7 +19,7 @@ function App() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     const stockData = {
-      symbol,
+      symbol: symbol.toUpperCase(),
       companyName,
       quantity: parseInt(quantity, 10),
       purchasePrice: parseFloat(price),
@@ -34,18 +35,22 @@ function App() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to add stock');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to add stock');
       }
 
       const result = await response.json();
-      console.log('📦 Stock successfully added:', result);
+      console.log('✅ Stock added:', result);
+      setMessage('Stock added successfully!');
 
+      // Reset form
       setSymbol('');
       setCompanyName('');
       setQuantity('');
       setPrice('');
     } catch (error) {
-      console.error('🚨 Error:', error.message);
+      console.error('❌ Submission error:', error.message);
+      setMessage('Error: ' + error.message);
     }
   };
 
@@ -59,6 +64,7 @@ function App() {
         <h1>📈 Deep Stock Portfolio Manager</h1>
         <p>Track and manage your investments effortlessly.</p>
       </header>
+
       <main className="app-main">
         <form className="stock-form" onSubmit={handleSubmit}>
           <div className="form-group">
@@ -92,7 +98,7 @@ function App() {
             />
           </div>
           <div className="form-group">
-            <label htmlFor="price">Price:</label>
+            <label htmlFor="price">Purchase Price:</label>
             <input
               type="number"
               id="price"
@@ -103,8 +109,11 @@ function App() {
           </div>
           <button type="submit">Add Stock</button>
         </form>
+
+        {message && <p className="status-message">{message}</p>}
         <Contact />
       </main>
+
       <footer className="app-footer">
         <p>© 2025 stock portfolio. All rights reserved.</p>
       </footer>
