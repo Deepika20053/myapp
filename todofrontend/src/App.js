@@ -7,6 +7,7 @@ import './App.css';
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [symbol, setSymbol] = useState('');
+  const [companyName, setCompanyName] = useState('');
   const [quantity, setQuantity] = useState('');
   const [price, setPrice] = useState('');
 
@@ -14,17 +15,38 @@ function App() {
     setIsAuthenticated(true);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const stockData = {
       symbol,
+      companyName,
       quantity: parseInt(quantity, 10),
-      price: parseFloat(price),
+      purchasePrice: parseFloat(price),
     };
-    console.log('Submitted Stock Data:', stockData);
-    setSymbol('');
-    setQuantity('');
-    setPrice('');
+
+    try {
+      const response = await fetch('https://stock-portfolio-tracker-kcf8.onrender.com/api/stocks', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(stockData)
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to add stock');
+      }
+
+      const result = await response.json();
+      console.log('📦 Stock successfully added:', result);
+
+      setSymbol('');
+      setCompanyName('');
+      setQuantity('');
+      setPrice('');
+    } catch (error) {
+      console.error('🚨 Error:', error.message);
+    }
   };
 
   if (!isAuthenticated) {
@@ -34,7 +56,7 @@ function App() {
   return (
     <div className="app-container">
       <header className="app-header">
-        <h1>📈  Deep Stock Portfolio Manager</h1>
+        <h1>📈 Deep Stock Portfolio Manager</h1>
         <p>Track and manage your investments effortlessly.</p>
       </header>
       <main className="app-main">
@@ -46,6 +68,16 @@ function App() {
               id="symbol"
               value={symbol}
               onChange={(e) => setSymbol(e.target.value)}
+              required
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="companyName">Company Name:</label>
+            <input
+              type="text"
+              id="companyName"
+              value={companyName}
+              onChange={(e) => setCompanyName(e.target.value)}
               required
             />
           </div>
@@ -71,7 +103,6 @@ function App() {
           </div>
           <button type="submit">Add Stock</button>
         </form>
-        {/* Include the Contact component */}
         <Contact />
       </main>
       <footer className="app-footer">
