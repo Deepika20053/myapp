@@ -9,15 +9,15 @@ function App() {
   const [companyName, setCompanyName] = useState('');
   const [quantity, setQuantity] = useState('');
   const [price, setPrice] = useState('');
-  const [stocks, setStocks] = useState([]);  // To hold fetched stocks
+  const [stocks, setStocks] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [message, setMessage] = useState('');
 
   const handleLogin = () => {
     setIsAuthenticated(true);
   };
 
-  // Fetch stocks from backend API
   const fetchStocks = async () => {
     setLoading(true);
     setError(null);
@@ -33,7 +33,6 @@ function App() {
     }
   };
 
-  // Load stocks when user logs in
   useEffect(() => {
     if (isAuthenticated) {
       fetchStocks();
@@ -59,18 +58,37 @@ function App() {
       if (!response.ok) throw new Error('Failed to add stock');
       const result = await response.json();
 
-      console.log('📦 Stock successfully added:', result);
+      setMessage('✅ Stock added successfully!');
+      setTimeout(() => setMessage(''), 3000);
 
-      // Clear inputs
       setSymbol('');
       setCompanyName('');
       setQuantity('');
       setPrice('');
 
-      // Refresh stock list after adding new stock
       fetchStocks();
     } catch (error) {
       console.error('🚨 Error:', error.message);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this stock?')) return;
+
+    try {
+      const response = await fetch(`https://stock-portfolio-tracker-kcf8.onrender.com/api/stocks/${id}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) throw new Error('Failed to delete stock');
+
+      setMessage('🗑 Stock deleted successfully!');
+      setTimeout(() => setMessage(''), 3000);
+
+      setStocks(prev => prev.filter(stock => stock._id !== id));
+    } catch (err) {
+      console.error('Error deleting stock:', err.message);
+      alert('Failed to delete stock.');
     }
   };
 
@@ -86,6 +104,8 @@ function App() {
       </header>
 
       <main className="app-main">
+        {message && <div style={{ backgroundColor: '#d4edda', padding: '10px', marginBottom: '10px', color: '#155724' }}>{message}</div>}
+
         <form className="stock-form" onSubmit={handleSubmit}>
           <div className="form-group">
             <label htmlFor="symbol">Stock Symbol:</label>
@@ -130,8 +150,6 @@ function App() {
           <button type="submit">Add Stock</button>
         </form>
 
-        <Contact />
-
         <section className="stock-list">
           <h2>Your Stocks</h2>
           {loading && <p>Loading stocks...</p>}
@@ -149,6 +167,7 @@ function App() {
                   <th>Total Value</th>
                   <th>Profit/Loss</th>
                   <th>% Profit/Loss</th>
+                  <th>Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -162,6 +181,11 @@ function App() {
                     <td>${(stock.quantity * stock.currentPrice).toFixed(2)}</td>
                     <td>${((stock.currentPrice - stock.purchasePrice) * stock.quantity).toFixed(2)}</td>
                     <td>{(((stock.currentPrice - stock.purchasePrice) / stock.purchasePrice) * 100).toFixed(2)}%</td>
+                    <td>
+                      <button onClick={() => handleDelete(stock._id)} style={{ backgroundColor: 'red', color: 'white' }}>
+                        Delete
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -171,6 +195,7 @@ function App() {
       </main>
 
       <footer className="app-footer">
+        <Contact />
         <p>© 2025 stock portfolio. All rights reserved.</p>
       </footer>
     </div>
