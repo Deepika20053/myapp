@@ -11,8 +11,8 @@ function App() {
   const [price, setPrice] = useState('');
   const [stocks, setStocks] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState('');
   const [error, setError] = useState(null);
+  const [successMsg, setSuccessMsg] = useState('');
 
   const handleLogin = () => {
     setIsAuthenticated(true);
@@ -56,16 +56,18 @@ function App() {
       });
 
       if (!response.ok) throw new Error('Failed to add stock');
-      await response.json();
+      const result = await response.json();
 
-      setMessage('✅ Stock added successfully!');
+      setSuccessMsg('✅ Stock added successfully!');
+      setTimeout(() => setSuccessMsg(''), 3000);
+
       setSymbol('');
       setCompanyName('');
       setQuantity('');
       setPrice('');
       fetchStocks();
     } catch (error) {
-      setMessage(`🚨 Error: ${error.message}`);
+      console.error('🚨 Error:', error.message);
     }
   };
 
@@ -75,16 +77,15 @@ function App() {
         method: 'DELETE',
       });
       if (!response.ok) throw new Error('Failed to delete stock');
-      setMessage('🗑️ Stock deleted successfully!');
+      setSuccessMsg('🗑️ Stock deleted successfully!');
+      setTimeout(() => setSuccessMsg(''), 3000);
       fetchStocks();
     } catch (error) {
-      setMessage(`🚨 Error: ${error.message}`);
+      console.error('❌ Error deleting stock:', error.message);
     }
   };
 
-  if (!isAuthenticated) {
-    return <Login onLogin={handleLogin} />;
-  }
+  if (!isAuthenticated) return <Login onLogin={handleLogin} />;
 
   return (
     <div className="app-container">
@@ -95,27 +96,51 @@ function App() {
 
       <main className="app-main">
         <form className="stock-form" onSubmit={handleSubmit}>
+          {successMsg && <p className="success-message">{successMsg}</p>}
           <div className="form-group">
             <label htmlFor="symbol">Stock Symbol:</label>
-            <input type="text" id="symbol" value={symbol} onChange={(e) => setSymbol(e.target.value)} required />
+            <input
+              type="text"
+              id="symbol"
+              value={symbol}
+              onChange={(e) => setSymbol(e.target.value)}
+              required
+            />
           </div>
           <div className="form-group">
             <label htmlFor="companyName">Company Name:</label>
-            <input type="text" id="companyName" value={companyName} onChange={(e) => setCompanyName(e.target.value)} required />
+            <input
+              type="text"
+              id="companyName"
+              value={companyName}
+              onChange={(e) => setCompanyName(e.target.value)}
+              required
+            />
           </div>
           <div className="form-group">
             <label htmlFor="quantity">Quantity:</label>
-            <input type="number" id="quantity" value={quantity} onChange={(e) => setQuantity(e.target.value)} required />
+            <input
+              type="number"
+              id="quantity"
+              value={quantity}
+              onChange={(e) => setQuantity(e.target.value)}
+              required
+            />
           </div>
           <div className="form-group">
             <label htmlFor="price">Price:</label>
-            <input type="number" id="price" value={price} onChange={(e) => setPrice(e.target.value)} required />
+            <input
+              type="number"
+              id="price"
+              value={price}
+              onChange={(e) => setPrice(e.target.value)}
+              required
+            />
           </div>
           <button type="submit">Add Stock</button>
         </form>
 
-        {message && <p className="message">{message}</p>}
+        <div style={{ height: '100vh' }}></div> {/* Scroll spacer */}
 
-        <section className="stock-list" style={{ marginTop: '100px' }}>
+        <section id="stocks" className="stock-list">
           <h2>Your Stocks</h2>
-          {loading && <p>Loa
